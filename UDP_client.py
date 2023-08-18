@@ -5,6 +5,7 @@ import threading
 import pygame
 import Main
 import Player
+import json
 # Examples of headers
 
 HEADER_USERNAME = "[0]type=username<>Flockland"
@@ -16,6 +17,8 @@ HEADER_PLAYERUPDATE= "[2]type=playerUpdate<> <x>0<x> <y>1<y> <dx>1<dx> <dy>1<dy>
 class Globals:
     username = ""
     world = []
+    CameraX = 0
+    CameraY = 0
     receivedPackets = []
     players = []
     def __init__(self) -> None:
@@ -36,12 +39,20 @@ def parse_received(recv):
         yPos = int(float(data.split("<y>")[1]))
         dx = int(float(data.split("<dx>")[1]))
         dy = int(float(data.split("<dy>")[1]))
+        Globals.CameraX = int(float(data.split("<cameraX>")[1]))
+        Globals.CameraY = int(float(data.split("<cameraY>")[1]))
+        
         playerName = data.split("<name>")[1]
         
         for player in Globals.players:
             if player.name == playerName:
-                player.x = xPos
-                player.y = yPos
+                if player.x != xPos:
+                    player.x = xPos
+                    print("PlayerX Changed")
+                if player.y != yPos:
+                    player.y = yPos
+                    print("PlayerY Changed")
+                
                 player.dx = dx
                 player.dy = dy
     
@@ -93,8 +104,6 @@ listenerThread.start()
 username = "Flockland"
 window = pygame.display.set_mode((800,800))
 
-CameraX = 0
-CameraY = 0
 
 game = True
 
@@ -112,15 +121,23 @@ while game:
                 if events.type == pygame.QUIT:
                     game = False
             keys = pygame.key.get_pressed()
+            keys = list(keys)
+            keys = keys[:-300]
+            realKeys = []
+            for key in keys:
+                if key == True:
+                    realKeys.append(1)
+                else:
+                    realKeys.append(0)
             mouse = pygame.mouse.get_pressed()
-            mouseCords = pygame.mouse.get_pos()
+            mouseCoords = pygame.mouse.get_pos()
+            playerInput = {"keys" : realKeys, "mouse" : mouse, "mouseCoords" : mouseCoords, "cameraX" : Globals.CameraX, "cameraY" : Globals.CameraY}
             for player in Globals.players:
                 if player.name == "Flockland":
                     Main.applyGrassLayer(Globals.world, player)
-                    Main.draw_world(window,Globals.world, CameraX, CameraY, player)
-                    CameraX, CameraY = player.update(keys, Globals.world, CameraX, CameraY)
-                    UDP.udp_send(f"type=playerUpdate<> <x>{player.x}<x> <y>{player.y}<y> <dx>{player.dx}<dx> <dy>{player.dy}<dy> <name>{username}<name>", 9999)
-                player.draw(window, CameraX, CameraY)
+                    Main.draw_world(window,Globals.world, Globals.CameraX, Globals.CameraY, player)
+                    UDP.udp_send(f"type=player_2_Update<>{player.name}<name>" + json.dumps(playerInput,separators=(',', ':')) , 9999)
+                player.draw(window, Globals.CameraX, Globals.CameraY)
             
             pygame.display.update()
             
